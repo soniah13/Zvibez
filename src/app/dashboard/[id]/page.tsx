@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getMockSubmission } from "@/lib/mock-data";
 import { formatEat } from "@/lib/format";
 import { DemoBanner } from "@/components/DemoBanner";
-import { ScreeningPanel } from "@/components/ScreeningPanel";
+import { ReportPanels } from "@/components/ReportPanels";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -35,48 +35,43 @@ async function Report({ params }: { params: PageProps<"/dashboard/[id]">["params
       <DemoBanner />
       <h1 className="text-xl font-semibold">{s.teamName}</h1>
 
-      <ScreeningPanel submissionId={s.id} initial={r} />
+      <ReportPanels submissionId={s.id} initial={r}>
+        <section>
+          <h2 className="mb-2 font-semibold">Team submission <span className="text-xs font-normal text-slate-500">(claims made by the team)</span></h2>
+          <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white px-4">
+            <Row label="Members">{s.members.map((m) => m.name).join(", ")}</Row>
+            <Row label="Track">{s.track}</Row>
+            <Row label="Challenge">{s.challenge}</Row>
+            <Row label="Problem">{s.problemDescription}</Row>
+            <Row label="Solution">{s.proposedSolution}</Row>
+            <Row label="Technologies">{s.technologies.join(", ")}</Row>
+            <Row label="AI tools used">{s.aiToolsUsed}</Row>
+            <Row label="External resources">{s.externalResources}</Row>
+            <Row label="Testing instructions">{s.testingInstructions || "—"}</Row>
+            <Row label="Links">
+              <a href={s.githubUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Repository</a>
+              {s.demoUrl && <> · <a href={s.demoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Demo</a></>}
+            </Row>
+          </dl>
+        </section>
 
-      <section>
-        <h2 className="mb-2 font-semibold">Team submission <span className="text-xs font-normal text-slate-500">(claims made by the team)</span></h2>
-        <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white px-4">
-          <Row label="Members">{s.members.map((m) => m.name).join(", ")}</Row>
-          <Row label="Track">{s.track}</Row>
-          <Row label="Challenge">{s.challenge}</Row>
-          <Row label="Problem">{s.problemDescription}</Row>
-          <Row label="Solution">{s.proposedSolution}</Row>
-          <Row label="Technologies">{s.technologies.join(", ")}</Row>
-          <Row label="AI tools used">{s.aiToolsUsed}</Row>
-          <Row label="External resources">{s.externalResources}</Row>
-          <Row label="Testing instructions">{s.testingInstructions || "—"}</Row>
-          <Row label="Links">
-            <a href={s.githubUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Repository</a>
-            {s.demoUrl && <> · <a href={s.demoUrl} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">Demo</a></>}
-          </Row>
-        </dl>
-      </section>
-
-      <section>
-        <h2 className="mb-2 font-semibold">Reviewer notes</h2>
-        {r.notes.length === 0 ? (
-          <p className="text-sm text-slate-500">No notes yet. Manual review controls arrive in Phase 4.</p>
-        ) : (
-          <ul className="space-y-2">
-            {r.notes.map((n) => (
-              <li key={n.id} className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
-                <p>{n.body}</p>
-                <p className="mt-1 text-xs text-slate-500">{n.author} · {formatEat(n.createdAt)}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="mt-2 text-xs text-slate-500">Final organizer decision: <strong>{r.finalDecision}</strong></p>
-      </section>
-
-      <section>
-        <h2 className="mb-2 font-semibold">AI summary</h2>
-        <p className="text-sm text-slate-500">Claude-powered summaries arrive in Phase 3.</p>
-      </section>
+        <section>
+          <h2 className="mb-2 font-semibold">Reviewer notes and final decision</h2>
+          {r.notes.length === 0 ? (
+            <p className="text-sm text-slate-500">No notes yet. Manual review controls arrive in Phase 4.</p>
+          ) : (
+            <ul className="space-y-2">
+              {r.notes.map((n) => (
+                <li key={n.id} className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                  <p>{n.body}</p>
+                  <p className="mt-1 text-xs text-slate-500">{n.author} · {formatEat(n.createdAt)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-2 text-xs text-slate-500">Final organizer decision: <strong>{r.finalDecision}</strong>. Only humans set this.</p>
+        </section>
+      </ReportPanels>
     </div>
   );
 }

@@ -24,8 +24,15 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-export function ScreeningPanel({ submissionId, initial }: { submissionId: string; initial: ScreeningResult }) {
-  const [r, setR] = useState(initial);
+export function ScreeningPanel({
+  submissionId,
+  result: r,
+  onResult,
+}: {
+  submissionId: string;
+  result: ScreeningResult;
+  onResult: (result: ScreeningResult) => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +43,7 @@ export function ScreeningPanel({ submissionId, initial }: { submissionId: string
       const res = await fetch(`/api/screening/${submissionId}`, { method: "POST" });
       const body = (await res.json().catch(() => null)) as { result?: ScreeningResult; error?: string } | null;
       if (!res.ok || !body?.result) throw new Error(body?.error ?? `Verification failed (HTTP ${res.status}).`);
-      setR(body.result);
+      onResult(body.result);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Verification failed.");
     } finally {

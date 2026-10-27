@@ -2,7 +2,8 @@ import type { BranchInspection, CommitRef, RepoEvidence } from "../github/types"
 import { formatEat } from "../format";
 import type { ScreeningFlag, Submission } from "../types";
 import { DEFAULT_POLICY, type ScreeningPolicy } from "./policy";
-import { classifyTimestamp, parseInstant } from "./window";
+import { EVENT } from "../constants";
+import { classifyTimestamp, eatDate, parseInstant } from "./window";
 
 /** A flag before Charlie assigns ids and resolution state. */
 export type FlagDraft = Omit<ScreeningFlag, "id" | "resolved">;
@@ -34,11 +35,18 @@ export function evaluateEvidence(
   const startEat = formatEat(policy.window.startUtc);
   const deadlineEat = formatEat(policy.window.deadlineUtc);
   if (created === "before_start") {
+    // Event rule: repositories created before the event date must be flagged; a genuinely empty one
+    // created before the 7:00 AM start on the event day may be accepted after manual review.
+    const isEmpty = evidence.branches.length > 0 && evidence.branches.every((b) => b.commits.length === 0 && b.historyComplete);
+    const onEventDay = eatDate(evidence.createdAt) === EVENT.date;
+    const emptyNote = isEmpty
+      ? ` The inspected branches contain no commits, so this looks like an empty repository${onEventDay ? " created on the event day before the start" : ""}; the event rules allow an organizer to accept that after manual review.`
+      : "";
     flags.push({
       code: "REPO_CREATED_BEFORE_START",
       kind: "verified",
-      title: "Repository created before the official start",
-      detail: `GitHub reports the repository was created ${formatEat(evidence.createdAt)}, before the official start (${startEat}). This is a verified repository fact, not proof the code pre-dates the event: a team may have created an empty repository early. Manual verification needed.`,
+      title: isEmpty ? "Empty repository created before the official start" : "Repository created before the official start",
+      detail: `GitHub reports the repository was created ${formatEat(evidence.createdAt)}, before the official start (${startEat}). This is a verified repository fact, not proof the code pre-dates the event: a team may have created an empty repository early.${emptyNote} Manual verification needed.`,
       timestamp: evidence.createdAt,
       evidenceUrl: evidence.htmlUrl,
     });

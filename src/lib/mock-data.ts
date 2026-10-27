@@ -150,7 +150,10 @@ const seeds: Seed[] = [
     external: "None.",
     testing: "",
     at: "2026-11-07T16:40:00Z",
-    missing: [{ field: "Testing instructions", reason: "Required field is empty." }],
+    missing: [
+      { field: "Testing instructions", reason: "Required field is empty." },
+      { field: "Demo URL", reason: "A live demo is required for the Software Engineering track." },
+    ],
   },
   {
     id: "s7",
@@ -201,6 +204,7 @@ const seeds: Seed[] = [
     problem: "Organizers need to see live verification working end to end.",
     solution: "Points at the public octocat/Hello-World repository. It pre-dates the event, so it should be flagged.",
     repo: "https://github.com/octocat/Hello-World",
+    demo: "https://demo.example.app",
     tech: ["Git"],
     ai: "None.",
     external: "None.",

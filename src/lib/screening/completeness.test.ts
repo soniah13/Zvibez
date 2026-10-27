@@ -25,15 +25,19 @@ describe("required submission fields", () => {
   });
 });
 
-describe("demo link is only required where the organizers say so", () => {
-  it("is optional by default for every track", () => {
-    expect(fields(checkCompleteness(makeSubmission(), undefined))).not.toContain("Demo URL");
-    expect(fields(checkCompleteness(ds, undefined))).not.toContain("Demo URL");
+describe("demo link follows the confirmed track rules", () => {
+  const noDemo = { demoUrl: undefined };
+  it("is required for Software Engineering by default", () => {
+    const r = checkCompleteness(makeSubmission(noDemo), undefined);
+    expect(fields(r)).toContain("Demo URL");
+    expect(r.missing.find((m) => m.field === "Demo URL")!.reason).toMatch(/Software Engineering/);
   });
-  it("is required for a designated track only", () => {
-    const policy = { ...DEFAULT_POLICY, demoUrlRequiredTracks: ["Software Engineering" as const] };
-    expect(fields(checkCompleteness(makeSubmission(), undefined, policy))).toContain("Demo URL");
-    expect(fields(checkCompleteness(ds, undefined, policy))).not.toContain("Demo URL");
+  it("is not required for Data Science by default", () => {
+    expect(fields(checkCompleteness({ ...ds, ...noDemo }, undefined))).not.toContain("Demo URL");
+  });
+  it("can be extended to other tracks through the policy", () => {
+    const policy = { ...DEFAULT_POLICY, demoUrlRequiredTracks: ["Software Engineering" as const, "Data Science" as const] };
+    expect(fields(checkCompleteness({ ...ds, ...noDemo }, undefined, policy))).toContain("Demo URL");
   });
   it("a provided demo link must be http(s), but its reachability is never tested", () => {
     expect(fields(checkCompleteness(makeSubmission({ demoUrl: "ftp://x" }), undefined))).toContain("Demo URL");

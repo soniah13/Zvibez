@@ -27,8 +27,10 @@ export interface ScreeningPolicy {
   declaredExternalCodeHandling: "manual_review" | "info_if_declared";
 
   /**
-   * ORGANIZER DECISION REQUIRED: which tracks must provide a live demo link?
-   * Default: none. A demo link is optional everywhere until the organizers say otherwise.
+   * Tracks that must provide a working deployment or demo link.
+   * Confirmed event rule: Software Engineering submissions require one. Data Science projects need
+   * reproducibility instructions and track-appropriate artifacts instead; add "Data Science" here
+   * if the track rules ever require a deployed demo for it too.
    * Charlie checks link presence and format only; it never fetches or tests a deployment.
    */
   demoUrlRequiredTracks: Track[];
@@ -43,6 +45,6 @@ export const DEFAULT_POLICY: ScreeningPolicy = {
   importedHistoryToleranceMs: 60 * 60 * 1000,
   largeInitialCommit: { minTotalChanges: 2000, minFilesChanged: 50 },
   declaredExternalCodeHandling: "manual_review",
-  demoUrlRequiredTracks: [],
+  demoUrlRequiredTracks: ["Software Engineering"],
   maxCommitSamples: 5,
 };

@@ -20,6 +20,8 @@ export interface GithubLimits {
   maxTreePaths: number;
   /** READMEs larger than this are not decoded. */
   maxReadmeBytes: number;
+  /** Characters of README text retained for the AI summary. */
+  maxReadmeExcerptChars: number;
 }
 
 export const DEFAULT_LIMITS: GithubLimits = {
@@ -30,6 +32,7 @@ export const DEFAULT_LIMITS: GithubLimits = {
   maxBranches: 5,
   maxTreePaths: 5_000,
   maxReadmeBytes: 200_000,
+  maxReadmeExcerptChars: 8_000,
 };
 
 export type GithubErrorKind =
@@ -262,10 +265,14 @@ export function createGithubClient(options: CreateOptions = {}) {
         const { data } = await request(`${base}/readme`);
         const d = data as { content?: string; encoding?: string; size?: number; html_url?: string };
         let hasSetupHints: boolean | undefined;
+        let excerpt: string | undefined;
         if (d.encoding === "base64" && typeof d.content === "string" && (d.size ?? 0) <= limits.maxReadmeBytes) {
-          hasSetupHints = detectSetupHints(Buffer.from(d.content, "base64").toString("utf8"));
+          const text = Buffer.from(d.content, "base64").toString("utf8");
+          hasSetupHints = detectSetupHints(text);
+          // Bounded, untrusted text kept server-side only (never returned to browsers) for the AI summary.
+          excerpt = text.slice(0, limits.maxReadmeExcerptChars);
         }
-        return { exists: true, url: d.html_url, hasSetupHints };
+        return { exists: true, url: d.html_url, hasSetupHints, excerpt };
       } catch (e) {
         if (asApiError(e).kind === "not_found") return { exists: false };
         throw e;

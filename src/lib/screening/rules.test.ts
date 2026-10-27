@@ -28,6 +28,24 @@ describe("repository creation vs the window", () => {
     expect(flag.evidenceUrl).toBe("https://github.com/o/r");
     expect(flag.timestamp).toBe("2026-11-07T03:59:59Z");
   });
+  it("a repository created before 7 November is flagged and is not described as empty when it has commits", () => {
+    const flag = find(evaluateEvidence(makeEvidence({ createdAt: "2026-11-01T10:00:00Z" }), sub), "REPO_CREATED_BEFORE_START")!;
+    expect(flag.title).toBe("Repository created before the official start");
+    expect(flag.detail).not.toMatch(/looks like an empty repository/);
+  });
+  it("a genuinely empty repository created before 7 AM on the event day is still flagged, with a manual-review note", () => {
+    const emptyBranch = { name: "main", isDefault: true, commits: [], historyComplete: true, totalCommits: 0 };
+    const flag = find(evaluateEvidence(makeEvidence({ createdAt: "2026-11-07T03:00:00Z", branches: [emptyBranch] }), sub), "REPO_CREATED_BEFORE_START")!;
+    expect(flag.kind).toBe("verified");
+    expect(flag.title).toBe("Empty repository created before the official start");
+    expect(flag.detail).toMatch(/created on the event day before the start/);
+    expect(flag.detail).toMatch(/accept that after manual review/);
+  });
+  it("an empty repository with unverified (partial) history is not called empty", () => {
+    const partial = { name: "main", isDefault: true, commits: [], historyComplete: false };
+    const flag = find(evaluateEvidence(makeEvidence({ createdAt: "2026-11-07T03:00:00Z", branches: [partial] }), sub), "REPO_CREATED_BEFORE_START")!;
+    expect(flag.title).toBe("Repository created before the official start");
+  });
   it("does not flag creation exactly at the start", () => {
     const f = evaluateEvidence(makeEvidence({ createdAt: "2026-11-07T04:00:00Z" }), sub);
     expect(codes(f)).not.toContain("REPO_CREATED_BEFORE_START");

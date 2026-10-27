@@ -40,6 +40,7 @@ export function makeSubmission(over: Partial<Submission> = {}): Submission {
     problemDescription: "p",
     proposedSolution: "s",
     githubUrl: "https://github.com/o/r",
+    demoUrl: "https://demo.example.app",
     technologies: ["ts"],
     aiToolsUsed: "None.",
     externalResources: "None.",

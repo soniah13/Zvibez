@@ -54,7 +54,13 @@ export interface RepoEvidence {
   branchListComplete: boolean;
   initialCommit?: InitialCommitInfo;
   tree?: { paths: string[]; truncated: boolean };
-  readme?: { exists: boolean; url?: string; hasSetupHints?: boolean };
+  readme?: {
+    exists: boolean;
+    url?: string;
+    hasSetupHints?: boolean;
+    /** Bounded README text. Untrusted. Server-side only: never include in responses sent to browsers. */
+    excerpt?: string;
+  };
   limitations: Limitation[];
 }
 

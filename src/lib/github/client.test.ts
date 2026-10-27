@@ -108,7 +108,7 @@ describe("successful verification", () => {
     const { c, calls } = client({ ...OK_BASE, "/repos/o/r/readme": json({ encoding: "base64", size: evil.length, content: Buffer.from(evil).toString("base64") }) });
     const out = await c.verifyRepository("https://github.com/o/r");
     expect(out.status).toBe("ok");
-    if (out.status === "ok") expect(out.evidence.readme).toEqual({ exists: true, url: undefined, hasSetupHints: false });
+    if (out.status === "ok") expect(out.evidence.readme).toEqual({ exists: true, url: undefined, hasSetupHints: false, excerpt: evil });
     expect(calls.some((x) => x.url.includes("evil.example"))).toBe(false);
   });
 });
