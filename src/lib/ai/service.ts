@@ -54,7 +54,7 @@ const err = (code: SummaryError["code"], message: string): SummaryOutcome => ({ 
 
 export function createSummaryService(options: ServiceOptions = {}) {
   const apiKey = options.apiKey !== undefined ? options.apiKey : process.env.ANTHROPIC_API_KEY;
-  const model = options.model ?? process.env.CHARLIE_AI_MODEL ?? DEFAULT_MODEL;
+  const model = options.model || process.env.CHARLIE_AI_MODEL || DEFAULT_MODEL;
   const timeoutMs = options.timeoutMs ?? 120_000;
   const now = options.now ?? (() => new Date());
   const ttl = options.cacheTtlMs ?? 6 * 60 * 60 * 1000;
@@ -156,7 +156,7 @@ export function createSummaryService(options: ServiceOptions = {}) {
     return promise;
   }
 
-  return { generate, model };
+  return { generate, model, configured: Boolean(apiKey) };
 }
 
 /** Maps SDK and network failures to organizer-friendly errors. Works on duck-typed errors too. */

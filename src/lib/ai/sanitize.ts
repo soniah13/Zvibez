@@ -26,7 +26,6 @@ export function redactSecrets(text: string): string {
 
 /** Removes control characters (keeps tab/newline), redacts secrets and bounds the length. */
 export function sanitizeText(text: string, maxChars: number): string {
-  // eslint-disable-next-line no-control-regex
   const clean = text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
   return redactSecrets(clean).slice(0, maxChars);
 }

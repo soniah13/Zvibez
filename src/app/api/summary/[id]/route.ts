@@ -30,6 +30,15 @@ export async function POST(req: Request, { params }: RouteContext<"/api/summary/
   const existing = getMockSubmission(id);
   if (!existing) return json({ error: { code: "not_found", message: "Submission not found." } }, 404);
 
+  // Fail fast and cheaply: no GitHub calls if AI is not configured.
+  const service = getSummaryService();
+  if (!service.configured) {
+    return json(
+      { error: { code: "not_configured", message: "AI summaries are not configured: ANTHROPIC_API_KEY is not set on the server." } },
+      STATUS.not_configured,
+    );
+  }
+
   const body = (await req.json().catch(() => null)) as { force?: unknown } | null;
   const force = body?.force === true;
 
@@ -45,7 +54,7 @@ export async function POST(req: Request, { params }: RouteContext<"/api/summary/
     // Use the live evidence the organizer already has; verify first only if there is none yet.
     const live = getLive(id) ?? (await verifyAndScreen(existing.submission, existing.screening));
 
-    const outcome = await getSummaryService().generate(
+    const outcome = await service.generate(
       { submission: existing.submission, screening: live.result, outcome: live.outcome },
       { force },
     );

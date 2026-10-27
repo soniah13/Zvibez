@@ -16,6 +16,26 @@ const evidenceOf = (req: SummaryRequest) => {
   return JSON.parse(msg.slice(msg.indexOf("{\n"))) as { evidence: { id: string; origin: string; text: string }[] };
 };
 
+describe("model configuration", () => {
+  it("an empty CHARLIE_AI_MODEL (as in .env.example) falls back to the default model", async () => {
+    const prior = process.env.CHARLIE_AI_MODEL;
+    process.env.CHARLIE_AI_MODEL = "";
+    try {
+      const create = ok();
+      await service(create).generate(await inputFor(okOutcome()));
+      expect(create.mock.calls[0][0].model).toBe(DEFAULT_MODEL);
+    } finally {
+      if (prior === undefined) delete process.env.CHARLIE_AI_MODEL;
+      else process.env.CHARLIE_AI_MODEL = prior;
+    }
+  });
+  it("uses an explicitly configured model", async () => {
+    const create = ok();
+    await service(create, { model: "claude-sonnet-5-5" }).generate(await inputFor(okOutcome()));
+    expect(create.mock.calls[0][0].model).toBe("claude-sonnet-5-5");
+  });
+});
+
 describe("a valid response", () => {
   it("returns an assembled, validated summary and sends one tool-free request", async () => {
     const create = ok();

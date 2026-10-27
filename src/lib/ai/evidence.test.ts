@@ -86,7 +86,6 @@ describe("secrets and sensitive files stay out", () => {
 
   it("strips control characters from untrusted text", async () => {
     const b = buildEvidenceBundle(await inputFor(okOutcome({ readme: { exists: true, excerpt: "Hello\u0000\u001b[31m world\u0007", hasSetupHints: true } })));
-    // eslint-disable-next-line no-control-regex
     expect(b.items.find((i) => i.id === "readme")!.text).not.toMatch(/[\u0000\u0007\u001b]/);
   });
 });
