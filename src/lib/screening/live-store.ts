@@ -11,8 +11,8 @@ import { runScreening } from "./run";
  */
 export interface LiveEntry {
   result: ScreeningResult;
-  /** Raw verification outcome, including README text and file paths. Never sent to browsers. */
-  outcome: VerifyOutcome;
+  /** Raw verification outcome, including README text and file paths. Never sent to browsers. Absent when no repository was submitted. */
+  outcome?: VerifyOutcome;
   savedAt: number;
 }
 
@@ -42,8 +42,7 @@ export function verifyAndScreen(submission: Submission, previous?: ScreeningResu
       verify: async (url) => (outcome = await github.verifyRepository(url)),
       previous,
     });
-    // verify() always runs inside runScreening, so outcome is set.
-    const entry: LiveEntry = { result, outcome: outcome as VerifyOutcome, savedAt: Date.now() };
+    const entry: LiveEntry = { result, outcome, savedAt: Date.now() };
     store.set(submission.id, entry);
     return entry;
   })().finally(() => inFlight.delete(submission.id));

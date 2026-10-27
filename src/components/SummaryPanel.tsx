@@ -6,8 +6,14 @@ import type { ProjectSummary, SummaryError } from "@/lib/ai/schema";
 import type { ScreeningResult } from "@/lib/types";
 import { FlagBadge, StatusBadge } from "./StatusBadge";
 
-type Basis = "team_claim" | "readme" | "file_paths";
-const BASIS_LABEL: Record<Basis, string> = { team_claim: "team claim", readme: "README", file_paths: "file paths" };
+type Basis = "team_claim" | "artifact_description" | "readme" | "file_paths";
+const BASIS_LABEL: Record<Basis, string> = { team_claim: "team claim", artifact_description: "team's artifact description", readme: "README", file_paths: "file paths" };
+const OUTCOME_LABEL: Record<string, { label: string; cls: string }> = {
+  met: { label: "Found", cls: "bg-emerald-50 text-emerald-800 ring-emerald-600/20" },
+  declared_not_inspected: { label: "Declared, not opened", cls: "bg-sky-50 text-sky-900 ring-sky-600/20" },
+  not_found: { label: "Not found", cls: "bg-amber-50 text-amber-900 ring-amber-600/30" },
+  unknown: { label: "Could not check", cls: "bg-slate-100 text-slate-700 ring-slate-500/30" },
+};
 const EVIDENCE_STATUS: Record<string, { label: string; cls: string }> = {
   supported: { label: "Supported by repository", cls: "bg-emerald-50 text-emerald-800 ring-emerald-600/20" },
   partially_supported: { label: "Partly supported", cls: "bg-amber-50 text-amber-900 ring-amber-600/30" },
@@ -20,6 +26,7 @@ const CHECK_LABELS: [keyof ProjectSummary["checksPerformed"], string][] = [
   ["commitHistory", "Commit history read"],
   ["fileListing", "File list read"],
   ["readmeExcerptRead", "README text read"],
+  ["artifactsOpened", "Artifact links opened (designs, notebooks, dashboards)"],
   ["sourceFilesRead", "Source file contents read"],
   ["codeExecuted", "Submitted code run"],
   ["deploymentTested", "Demo / deployment tested"],
@@ -110,8 +117,9 @@ export function SummaryPanel({ submissionId, onScreening }: { submissionId: stri
 
       {!summary && !loading && !error && (
         <p className="text-sm text-slate-500">
-          Claude writes a briefing for judges from the team&apos;s submission, the GitHub verification results and a bounded README
-          excerpt and file list. Source code is not read, and secrets are removed before anything is sent. It does not change the
+          Claude writes a briefing for judges from the team&apos;s submission and artifact descriptions, the verification results and,
+          when there is a repository, a bounded README excerpt and file list. Source code is not read, artifact links are not opened,
+          and secrets are removed before anything is sent. It does not change the
           screening status or decide eligibility.
         </p>
       )}
@@ -151,6 +159,9 @@ function SummaryBody({ summary: m, cached }: { summary: ProjectSummary; cached: 
 
       <Section tag="Team claims" tagClass="bg-slate-100 text-slate-700 ring-slate-500/30" title="What the team says" note="Copied from the submission. Not verified.">
         <dl className="divide-y divide-slate-100">
+          <Row label="Track">{m.claims.track}</Row>
+          <Row label="Disciplines">{[...m.claims.disciplines, ...(m.claims.otherDiscipline ? [`Other: ${m.claims.otherDiscipline}`] : [])].join("; ")}</Row>
+          <Row label="Project format">{m.claims.projectFormats.join("; ")}</Row>
           <Row label="Problem">{m.claims.problem}</Row>
           <Row label="Solution">{m.claims.solution}</Row>
           <Row label="Technologies">{m.claims.technologies.join(", ")}</Row>
@@ -158,18 +169,67 @@ function SummaryBody({ summary: m, cached }: { summary: ProjectSummary; cached: 
           <Row label="External resources declared">{m.claims.externalResourcesDeclared}</Row>
           <Row label="Testing instructions">{m.claims.testingInstructions || "—"}</Row>
         </dl>
+        {m.claims.artifacts.length > 0 && (
+          <div>
+            <h4 className="pt-2 text-sm font-medium">Artifacts the team links (not opened by Charlie)</h4>
+            <ul className="list-disc space-y-1 pl-5 text-sm">
+              {m.claims.artifacts.map((a, i) => (
+                <li key={i}>
+                  {a.type} on {a.platform}: {a.description}{" "}
+                  <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">link</a>
+                  {a.timelineEvidence && <span className="block text-xs text-slate-600">Team states: {a.timelineEvidence} (unverified)</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Section>
 
       <Section
-        tag={v.screeningSource === "live" ? "GitHub facts · live" : "Screening · mock"}
+        tag={v.screeningSource === "live" ? (v.repository ? "GitHub facts · live" : "Screening · live") : "Screening · mock"}
         tagClass="bg-sky-50 text-sky-900 ring-sky-600/20"
-        title="Repository verification findings"
+        title="Verification findings"
         note="From Charlie's deterministic checks, not from the AI. Flags are signals for humans, not proof of misconduct."
       >
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <StatusBadge status={v.status} />
           <span className="text-slate-700">{v.statusExplanation}</span>
         </div>
+        {m.expectedEvidence.length > 0 && (
+          <div>
+            <h4 className="text-sm font-medium">Evidence expected for this project&apos;s format</h4>
+            <ul className="space-y-1 text-sm">
+              {v.requirements.length > 0
+                ? v.requirements.map((r) => {
+                    const o = OUTCOME_LABEL[r.outcome];
+                    return (
+                      <li key={r.key}>
+                        <span className={`${chip} ${o.cls}`}>{o.label}</span> {r.label}{" "}
+                        <span className="text-xs text-slate-500">({r.level})</span>
+                        <span className="block text-xs text-slate-600">{r.detail}</span>
+                      </li>
+                    );
+                  })
+                : m.expectedEvidence.map((e) => (
+                    <li key={e.label}>
+                      {e.label} <span className="text-xs text-slate-500">({e.level}, not checked yet)</span>
+                    </li>
+                  ))}
+            </ul>
+          </div>
+        )}
+        {v.artifactReviews.length > 0 && (
+          <div>
+            <h4 className="text-sm font-medium">Artifacts recorded for manual inspection</h4>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {v.artifactReviews.map((r, i) => (
+                <li key={i}>
+                  {r.type.replace(/_/g, " ")} on {r.platform}. Creation time verified: <strong>{r.creationTimeVerified ? "yes" : "no"}</strong>. {r.note}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {v.missing.length > 0 && (
           <ul className="list-disc pl-5 text-sm text-slate-600">
             {v.missing.map((x) => (
@@ -210,6 +270,11 @@ function SummaryBody({ summary: m, cached }: { summary: ProjectSummary; cached: 
         <dl className="divide-y divide-slate-100">
           <Row label="Problem (as stated)">{a.problemSummary}</Row>
           <Row label="Solution (as stated)">{a.solutionSummary}</Row>
+          <Row label="Core deliverable">{a.coreDeliverable}</Row>
+          <Row label="Approach">
+            {a.approach.summary}
+            <Refs refs={a.approach.evidenceRefs} />
+          </Row>
         </dl>
 
         <h4 className="pt-2 text-sm font-medium">Main features</h4>

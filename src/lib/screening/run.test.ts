@@ -77,7 +77,7 @@ describe("flag evidence", () => {
 describe("re-running preserves organizer work", () => {
   const previous: ScreeningResult = {
     submissionId: "s",
-    source: "mock",
+    source: "mock", requirements: [], artifactReviews: [],
     status: "needs_review",
     explanation: "",
     missing: [],

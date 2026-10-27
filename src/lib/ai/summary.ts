@@ -1,5 +1,6 @@
 import type { ScreeningResult, Submission } from "../types";
 import type { EvidenceBundle } from "./evidence";
+import { artifactLabel, disciplineLabel, formatLabel, platformOf } from "../taxonomy";
 import type { ModelOutput, ProjectSummary, TeamClaims, VerificationSection } from "./schema";
 
 /** Verdict language the model must never produce. Humans decide eligibility. */
@@ -64,7 +65,11 @@ export function sanitizeOutput(out: ModelOutput, bundle: EvidenceBundle): Saniti
     if (!feature) return [];
     const refs = cleanRefs(f.evidenceRefs);
     const needs = f.basis === "readme" ? "readme" : f.basis === "file_paths" ? "files" : null;
-    const ok = needs ? refs.includes(needs) : refs.some((r) => r.startsWith("claim."));
+    const ok = needs
+      ? refs.includes(needs)
+      : f.basis === "artifact_description"
+        ? refs.some((r) => r.startsWith("claim.artifact."))
+        : refs.some((r) => r.startsWith("claim."));
     if (!ok) {
       note("Features that were not backed by their stated source were removed.");
       return [];
@@ -75,7 +80,9 @@ export function sanitizeOutput(out: ModelOutput, bundle: EvidenceBundle): Saniti
   const technologies = out.technologies.slice(0, MAX.technologies).flatMap((t) => {
     const name = scrub(t.name);
     if (!name) return [];
-    const sourceAvailable = t.basis === "team_claim" || (t.basis === "readme" && known.has("readme")) || (t.basis === "file_paths" && known.has("files"));
+    const sourceAvailable =
+      t.basis === "team_claim" ||
+      (t.basis === "artifact_description" && [...known].some((id) => id.startsWith("claim.artifact."))) || (t.basis === "readme" && known.has("readme")) || (t.basis === "file_paths" && known.has("files"));
     if (sourceAvailable) return [{ name, basis: t.basis }];
     // Cited a source that was never supplied: keep only if the team itself listed it.
     if (claimText.includes(name.toLowerCase())) return [{ name, basis: "team_claim" as const }];
@@ -109,10 +116,21 @@ export function sanitizeOutput(out: ModelOutput, bundle: EvidenceBundle): Saniti
     return [{ statement, evidenceRefs: refs }];
   });
 
+  const approachRefs = cleanRefs(out.approach.evidenceRefs);
+  const approachText = scrub(out.approach.summary);
+  // An approach nobody can trace to the supplied evidence is not shown as if it were grounded.
+  const approach =
+    approachText && approachRefs.length > 0
+      ? { summary: approachText, evidenceRefs: approachRefs }
+      : { summary: "The supplied evidence does not describe the implementation or analysis approach.", evidenceRefs: [] as string[] };
+  if (!approachText || approachRefs.length === 0) note("An approach statement without supporting evidence was replaced.");
+
   const assessment: ModelOutput = {
     overview: scrubOrPlaceholder(out.overview),
     problemSummary: scrubOrPlaceholder(out.problemSummary),
     solutionSummary: scrubOrPlaceholder(out.solutionSummary),
+    coreDeliverable: scrubOrPlaceholder(out.coreDeliverable),
+    approach,
     mainFeatures,
     technologies,
     implementationEvidence,
@@ -138,10 +156,15 @@ export function deterministicLimitations(bundle: EvidenceBundle, removed: number
     "File paths show that files exist, not that they work or that they are the team's own work.",
     "Repository and commit timestamps are evidence, not proof, of when code was written.",
   ];
-  if (!c.repositoryMetadata) list.push("The repository could not be inspected, so this summary rests on the team's own description.");
+  if (!bundle.repoSubmitted) {
+    list.push("No GitHub repository was submitted, so no repository evidence exists. This summary rests on the team's own description of its work and artifacts.");
+  } else if (!c.repositoryMetadata) list.push("The repository could not be inspected, so this summary rests on the team's own description.");
   else {
     if (!c.fileListing) list.push("The repository file list was not available.");
     if (!c.readmeExcerptRead) list.push("README text was not available to read.");
+  }
+  if (bundle.items.some((i) => i.id.startsWith("claim.artifact."))) {
+    list.push("The team's linked artifacts (designs, notebooks, dashboards, models, documents) were not opened. Their descriptions are the team's claims, and their creation times are unverified.");
   }
   if (removed > 0) list.push(`${removed} statement(s) in the AI output were removed or downgraded because the supplied evidence did not support them.`);
   return list;
@@ -161,6 +184,16 @@ export function assembleSummary(args: {
 
   const claims: TeamClaims = {
     track: s.track,
+    disciplines: s.disciplines.map(disciplineLabel),
+    otherDiscipline: s.otherDiscipline,
+    projectFormats: s.projectFormats.map(formatLabel),
+    artifacts: (s.artifacts ?? []).map((a) => ({
+      type: artifactLabel(a.type),
+      platform: platformOf(a.url),
+      url: a.url,
+      description: a.description,
+      timelineEvidence: a.timelineEvidence || undefined,
+    })),
     challenge: s.challenge,
     problem: s.problemDescription,
     solution: s.proposedSolution,
@@ -179,6 +212,8 @@ export function assembleSummary(args: {
     statusExplanation: r.explanation,
     finalDecision: r.finalDecision,
     missing: r.missing.map((m) => ({ ...m })),
+    requirements: r.requirements.map((q) => ({ ...q })),
+    artifactReviews: r.artifactReviews.map((a) => ({ ...a })),
     flags: r.flags.map((f) => ({ code: f.code, kind: f.kind, title: f.title, detail: f.detail, evidenceUrl: f.evidenceUrl, resolved: f.resolved })),
     repository: gh && {
       accessible: gh.accessible,
@@ -202,6 +237,7 @@ export function assembleSummary(args: {
     model: args.model,
     evidenceFingerprint: args.fingerprint,
     claims,
+    expectedEvidence: bundle.expectations.map((e) => ({ label: e.label, level: e.level, expectation: e.expectation })),
     verification,
     checksPerformed: { ...bundle.checks },
     assessment: { ...assessment, limitations },

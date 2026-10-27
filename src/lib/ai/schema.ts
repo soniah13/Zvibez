@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { FinalDecision, ScreeningStatus, Track } from "../constants";
-import type { FlagKind, MissingItem } from "../types";
+import type { ArtifactReview, FlagKind, MissingItem, RequirementResult } from "../types";
 
 /**
  * What the model is allowed to return. Deliberately assessment-only: the team's claims and the
@@ -9,12 +9,16 @@ import type { FlagKind, MissingItem } from "../types";
  * and limits are enforced after parsing in summary.ts.
  */
 const refs = z.array(z.string());
-const basis = z.enum(["team_claim", "readme", "file_paths"]);
+const basis = z.enum(["team_claim", "artifact_description", "readme", "file_paths"]);
 
 export const modelOutputSchema = z.object({
   overview: z.string(),
   problemSummary: z.string(),
   solutionSummary: z.string(),
+  /** What the team says its core deliverable is, in terms of its declared format. */
+  coreDeliverable: z.string(),
+  /** The implementation or analysis approach, only as far as the evidence describes it. */
+  approach: z.object({ summary: z.string(), evidenceRefs: refs }),
   mainFeatures: z.array(z.object({ feature: z.string(), basis, evidenceRefs: refs })),
   technologies: z.array(z.object({ name: z.string(), basis })),
   implementationEvidence: z.array(
@@ -52,6 +56,8 @@ export interface ChecksPerformed {
   commitHistory: boolean;
   fileListing: boolean;
   readmeExcerptRead: boolean;
+  /** Never performed: artifact links (designs, notebooks, dashboards, deployments) are recorded, not opened. */
+  artifactsOpened: false;
   /** Never performed: submitted source files are not read, only their paths. */
   sourceFilesRead: false;
   codeExecuted: false;
@@ -62,6 +68,11 @@ export interface ChecksPerformed {
 /** Everything under `claims` is copied verbatim from the submission. It is the team's own statement. */
 export interface TeamClaims {
   track: Track;
+  disciplines: string[];
+  otherDiscipline?: string;
+  projectFormats: string[];
+  /** Links and descriptions exactly as the team wrote them. Not opened. */
+  artifacts: { type: string; platform: string; url: string; description: string; timelineEvidence?: string }[];
   challenge: string;
   problem: string;
   solution: string;
@@ -69,7 +80,7 @@ export interface TeamClaims {
   aiToolsDeclared: string;
   externalResourcesDeclared: string;
   testingInstructions: string;
-  githubUrl: string;
+  githubUrl?: string;
   demoUrl?: string;
 }
 
@@ -80,6 +91,10 @@ export interface VerificationSection {
   statusExplanation: string;
   finalDecision: FinalDecision;
   missing: MissingItem[];
+  /** What the declared formats and track expect, and what was found for each. */
+  requirements: RequirementResult[];
+  /** Non-repository artifacts as recorded for organizers. None was opened or verified by Charlie. */
+  artifactReviews: ArtifactReview[];
   flags: { code: string; kind: FlagKind; title: string; detail: string; evidenceUrl?: string; resolved: boolean }[];
   repository?: {
     accessible?: boolean;
@@ -98,6 +113,8 @@ export interface ProjectSummary {
   evidenceFingerprint: string;
   /** Section 1: what the team says. Unverified. */
   claims: TeamClaims;
+  /** What the organizers' policy expects for the declared formats and track. Code-derived, not AI. */
+  expectedEvidence: { label: string; level: "required" | "expected"; expectation: string }[];
   /** Section 2: what the deterministic checks found. */
   verification: VerificationSection;
   checksPerformed: ChecksPerformed;

@@ -26,7 +26,7 @@ describe("what the AI is allowed to see", () => {
   it("includes human organizer notes, labelled as such, without the author", async () => {
     const sub = makeSubmission();
     const input = await inputFor(okOutcome(), sub, {
-      submissionId: "s", source: "mock", status: "needs_review", explanation: "", missing: [], flags: [], finalDecision: "pending",
+      submissionId: "s", source: "mock", status: "needs_review", explanation: "", missing: [], flags: [], requirements: [], artifactReviews: [], finalDecision: "pending",
       notes: [{ id: "n1", author: "organizer@zindua.test", createdAt: "2026-11-07T10:00:00Z", body: "Team confirmed the fork." }],
     });
     const b = buildEvidenceBundle(input);
@@ -37,12 +37,12 @@ describe("what the AI is allowed to see", () => {
   it("records only the checks that really happened", async () => {
     const b = buildEvidenceBundle(await inputFor(okOutcome()));
     expect(b.checks).toEqual({
-      repositoryMetadata: true, commitHistory: true, fileListing: true, readmeExcerptRead: true,
+      repositoryMetadata: true, commitHistory: true, fileListing: true, readmeExcerptRead: true, artifactsOpened: false,
       sourceFilesRead: false, codeExecuted: false, deploymentTested: false, modelEvaluated: false,
     });
     const checks = b.items.find((i) => i.id === "checks")!.text;
     expect(checks).toMatch(/Read source file contents: no/);
-    expect(checks).toMatch(/Opened or tested the demo or deployment: no/);
+    expect(checks).toMatch(/Opened or tested the demo, deployment or any artifact link.*: no/);
   });
 });
 

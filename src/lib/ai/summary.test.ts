@@ -163,7 +163,7 @@ describe("existing screening state is preserved", () => {
   it("does not change or mutate the screening result, statuses or organizer decision", async () => {
     const sub = makeSubmission({ testingInstructions: "" }); // incomplete
     const input = await inputFor(okOutcome({ createdAt: "2026-11-01T10:00:00Z" }), sub, {
-      submissionId: "s", source: "mock", status: "needs_review", explanation: "", missing: [], flags: [],
+      submissionId: "s", source: "mock", status: "needs_review", explanation: "", missing: [], flags: [], requirements: [], artifactReviews: [],
       notes: [{ id: "n", author: "org", createdAt: "2026-11-07T10:00:00Z", body: "Called the team." }], finalDecision: "escalated",
     });
     const before = JSON.stringify(input.screening);

@@ -13,6 +13,13 @@ const GROUPS: { kind: FlagKind; title: string; blurb: string }[] = [
   { kind: "info", title: "Information", blurb: "Context only. Does not affect the status." },
 ];
 
+const OUTCOME: Record<string, { label: string; cls: string }> = {
+  met: { label: "Found", cls: "bg-emerald-50 text-emerald-800 ring-emerald-600/20" },
+  declared_not_inspected: { label: "Declared, not opened", cls: "bg-sky-50 text-sky-900 ring-sky-600/20" },
+  not_found: { label: "Not found", cls: "bg-amber-50 text-amber-900 ring-amber-600/30" },
+  unknown: { label: "Could not check", cls: "bg-slate-100 text-slate-700 ring-slate-500/30" },
+};
+
 const yn = (v?: boolean, unknown = "Unknown") => (v === undefined ? unknown : v ? "Yes" : "No");
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -28,10 +35,12 @@ export function ScreeningPanel({
   submissionId,
   result: r,
   onResult,
+  hasRepository,
 }: {
   submissionId: string;
   result: ScreeningResult;
   onResult: (result: ScreeningResult) => void;
+  hasRepository: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +72,7 @@ export function ScreeningPanel({
           <span
             className={`rounded px-2 py-0.5 text-xs font-medium ${live ? "bg-sky-100 text-sky-900" : "bg-amber-100 text-amber-900"}`}
           >
-            {live ? `Live GitHub verification · ${formatEat(gh?.checkedAt)}` : "Mock result · demo data, not live"}
+            {live ? (hasRepository ? `Live GitHub verification · ${formatEat(gh?.checkedAt)}` : "Live rule check · no repository submitted") : "Mock result · demo data, not live"}
           </span>
           <button
             type="button"
@@ -71,7 +80,7 @@ export function ScreeningPanel({
             disabled={loading}
             className="ml-auto rounded-md bg-slate-900 px-3 py-1.5 text-sm text-white hover:bg-slate-700 disabled:opacity-60"
           >
-            {loading ? "Checking GitHub…" : live ? "Re-run verification" : "Run live verification"}
+            {loading ? (hasRepository ? "Checking GitHub…" : "Checking…") : live ? "Re-run verification" : hasRepository ? "Run live verification" : "Re-run checks"}
           </button>
         </div>
         <p className="text-sm text-slate-700">{r.explanation}</p>
@@ -111,6 +120,47 @@ export function ScreeningPanel({
           );
         })}
       </section>
+
+      {r.requirements.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-semibold">Evidence expected for this project&apos;s format</h2>
+          <p className="mb-2 text-xs text-slate-500">
+            Set by the organizers&apos; policy for the declared format and track. A link alone does not count: the artifact must be of a
+            suitable type, or repository files must match. Nothing was opened or run.
+          </p>
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white px-4">
+            {r.requirements.map((q) => {
+              const o = OUTCOME[q.outcome];
+              return (
+                <li key={q.key} className="py-2 text-sm">
+                  <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset ${o.cls}`}>{o.label}</span>{" "}
+                  {q.label} <span className="text-xs text-slate-500">({q.level})</span>
+                  <p className="text-xs text-slate-600">{q.detail}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {r.artifactReviews.length > 0 && (
+        <section>
+          <h2 className="mb-2 font-semibold">Artifacts recorded for manual inspection</h2>
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white px-4">
+            {r.artifactReviews.map((a, i) => (
+              <li key={i} className="py-2 text-sm">
+                <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-blue-700 underline">
+                  {a.type.replace(/_/g, " ")} on {a.platform}
+                </a>{" "}
+                <span className="text-xs text-slate-500">Creation time verified: {a.creationTimeVerified ? "yes" : "no"}</span>
+                <p className="text-xs text-slate-600">Team&apos;s description: {a.description}</p>
+                {a.timelineEvidence && <p className="text-xs text-slate-600">Team states (unverified): {a.timelineEvidence}</p>}
+                <p className="text-xs text-slate-500">{a.note}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 font-semibold">Repository verification</h2>
@@ -153,7 +203,7 @@ export function ScreeningPanel({
               )}
             </>
           ) : (
-            <Row label="Status">Not yet checked. Use “Run live verification”.</Row>
+            <Row label="Status">{hasRepository ? "Not yet checked. Use “Run live verification”." : "No GitHub repository was submitted, so none was checked. See the artifacts above."}</Row>
           )}
         </dl>
         <p className="mt-1 text-xs text-slate-500">

@@ -30,6 +30,8 @@ export function validOutput(over: Partial<ModelOutput> = {}): ModelOutput {
     overview: "The team states it built a water kiosk finder. The repository contains a TypeScript source tree.",
     problemSummary: "The team states residents cannot find working water kiosks.",
     solutionSummary: "The team states it built a searchable kiosk directory.",
+    coreDeliverable: "The team states the deliverable is a searchable web directory of water kiosks.",
+    approach: { summary: "The README describes a Node API behind a search page.", evidenceRefs: ["readme"] },
     mainFeatures: [{ feature: "Kiosk search", basis: "readme", evidenceRefs: ["readme"] }],
     technologies: [{ name: "ts", basis: "team_claim" }],
     implementationEvidence: [

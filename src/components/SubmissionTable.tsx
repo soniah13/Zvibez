@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { SubmissionWithScreening } from "@/lib/types";
 import { formatEat } from "@/lib/format";
+import { formatLabel } from "@/lib/taxonomy";
 import { StatusBadge } from "./StatusBadge";
 
 export function SubmissionTable({ items }: { items: SubmissionWithScreening[] }) {
@@ -18,6 +19,7 @@ export function SubmissionTable({ items }: { items: SubmissionWithScreening[] })
           <tr>
             <th className="px-4 py-2 font-medium">Team</th>
             <th className="px-4 py-2 font-medium">Track</th>
+            <th className="px-4 py-2 font-medium">Format</th>
             <th className="px-4 py-2 font-medium">Status</th>
             <th className="px-4 py-2 font-medium">Why</th>
             <th className="px-4 py-2 font-medium">Links</th>
@@ -33,10 +35,12 @@ export function SubmissionTable({ items }: { items: SubmissionWithScreening[] })
                 </Link>
               </td>
               <td className="px-4 py-3 text-slate-600">{s.track}</td>
+              <td className="px-4 py-3 text-slate-600">{s.projectFormats.map(formatLabel).join(", ")}</td>
               <td className="px-4 py-3"><StatusBadge status={screening.status} /></td>
               <td className="max-w-sm px-4 py-3 text-slate-600">{screening.explanation}</td>
               <td className="space-y-1 px-4 py-3">
-                <a href={s.githubUrl} target="_blank" rel="noopener noreferrer" className="block text-blue-700 underline">Repo</a>
+                {s.githubUrl && <a href={s.githubUrl} target="_blank" rel="noopener noreferrer" className="block text-blue-700 underline">Repo</a>}
+                {s.artifacts.length > 0 && <span className="block text-xs text-slate-500">{s.artifacts.length} artifact{s.artifacts.length === 1 ? "" : "s"}</span>}
                 {s.demoUrl && (
                   <a href={s.demoUrl} target="_blank" rel="noopener noreferrer" className="block text-blue-700 underline">Demo</a>
                 )}

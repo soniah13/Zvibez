@@ -1,6 +1,7 @@
 import { collectCommits } from "./rules";
 import type { RepoEvidence, VerifyOutcome } from "../github/types";
 import type { GithubVerification, ScreeningFlag, ScreeningResult, Submission } from "../types";
+import { artifactFlags, DEFAULT_PROVIDERS, reviewArtifacts, type ArtifactProvider } from "./artifacts";
 import { checkCompleteness } from "./completeness";
 import { DEFAULT_POLICY, type ScreeningPolicy } from "./policy";
 import { evaluateEvidence, type FlagDraft } from "./rules";
@@ -11,6 +12,8 @@ export interface RunOptions {
   /** Performs the GitHub verification. Injected so this module stays pure and testable. */
   verify: (githubUrl: string) => Promise<VerifyOutcome>;
   policy?: ScreeningPolicy;
+  /** Reviewers for non-GitHub artifacts. Defaults to manual review for every platform. */
+  providers?: ArtifactProvider[];
   /** An earlier result for the same submission. Its notes, final decision and resolved flags are kept. */
   previous?: ScreeningResult;
 }
@@ -21,12 +24,15 @@ export interface RunOptions {
  */
 export async function runScreening(submission: Submission, opts: RunOptions): Promise<ScreeningResult> {
   const policy = opts.policy ?? DEFAULT_POLICY;
-  const outcome = await opts.verify(submission.githubUrl);
+  // A repository is verified only if one was submitted. Not every deliverable lives in GitHub.
+  const outcome = submission.githubUrl?.trim() ? await opts.verify(submission.githubUrl) : undefined;
+  const artifactReviews = await reviewArtifacts(submission, opts.providers ?? DEFAULT_PROVIDERS);
 
   const completeness = checkCompleteness(submission, outcome, policy);
   const drafts: FlagDraft[] = [
     ...completeness.flags,
-    ...(outcome.status === "ok" ? evaluateEvidence(outcome.evidence, submission, policy) : []),
+    ...artifactFlags(submission, artifactReviews),
+    ...(outcome?.status === "ok" ? evaluateEvidence(outcome.evidence, submission, policy) : []),
   ];
 
   const flags = finalizeFlags(submission.id, drafts, opts.previous?.flags ?? []);
@@ -39,7 +45,9 @@ export async function runScreening(submission: Submission, opts: RunOptions): Pr
     explanation,
     missing: completeness.missing,
     flags,
-    github: summarize(outcome),
+    requirements: completeness.requirements,
+    artifactReviews,
+    github: outcome ? summarize(outcome) : undefined,
     // Carried over: a re-run must never erase an organizer's work.
     notes: opts.previous?.notes ?? [],
     finalDecision: opts.previous?.finalDecision ?? "pending",

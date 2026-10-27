@@ -1,11 +1,15 @@
 import type { Track } from "./constants";
+import { artifactFlags, manualReviews } from "./screening/artifacts";
+import { checkCompleteness } from "./screening/completeness";
 import { deriveStatus } from "./screening/status";
+import type { Artifact, Discipline, ProjectFormat } from "./taxonomy";
 import type {
   FlagKind,
   GithubVerification,
   MissingItem,
   ReviewNote,
   ScreeningFlag,
+  Submission,
   SubmissionWithScreening,
 } from "./types";
 
@@ -14,10 +18,16 @@ interface Seed {
   team: string;
   members: string[];
   track: Track;
+  /** Defaults by track when omitted (older seeds). */
+  disciplines?: Discipline[];
+  formats?: ProjectFormat[];
   challenge: string;
   problem: string;
   solution: string;
-  repo: string;
+  repo?: string;
+  artifacts?: Artifact[];
+  /** true: screening is computed by Charlie's own rules from the submission (no GitHub call). Otherwise hand-seeded. */
+  computed?: boolean;
   demo?: string;
   tech: string[];
   ai: string;
@@ -211,9 +221,171 @@ const seeds: Seed[] = [
     testing: "Run live verification from the report page.",
     at: "2026-11-07T12:00:00Z",
   },
+  {
+    // Design project: no repository. Evidence lives on a design platform, so its timeline needs manual inspection.
+    id: "s10",
+    team: "Pesa Plain Studio",
+    members: ["Wanjiku Maina", "Tom Okello"],
+    track: "Software Engineering",
+    disciplines: ["design"],
+    formats: ["design_prototype"],
+    challenge: "Make mobile money easier for first-time users",
+    problem: "First-time mobile money users abandon transfers because confirmation screens use unfamiliar financial jargon.",
+    solution: "A plain-language transfer flow with visual confirmation steps, tested as a clickable prototype.",
+    artifacts: [
+      { type: "design_prototype", url: "https://www.figma.com/proto/pesa-plain-example", description: "Clickable prototype of the transfer flow (12 screens).", timelineEvidence: "Figma version history starts 7 Nov, 07:40 EAT; page 'Flow v1' created at 08:15." },
+      { type: "design_documentation", url: "https://www.figma.com/board/pesa-plain-flows-example", description: "User flow diagram and the three usability-test notes." },
+    ],
+    tech: ["Figma", "FigJam"],
+    ai: "None.",
+    external: "Material Design icon set. No templates.",
+    testing: "Open the prototype and follow the 'Send money' path. The flow board explains each step.",
+    at: "2026-11-07T15:40:00Z",
+    computed: true,
+  },
+  {
+    // Dashboard / BI project on a non-GitHub platform.
+    id: "s11",
+    team: "Kilimo Insights",
+    members: ["Esther Njeri", "Dennis Ochieng", "Faith Akinyi"],
+    track: "Data Science",
+    disciplines: ["analytics_bi", "data_science"],
+    formats: ["dashboard_bi", "data_analysis"],
+    challenge: "Predict maize price volatility",
+    problem: "County agricultural officers lack a simple view of how maize prices moved over the last five years.",
+    solution: "A Power BI dashboard of county price trends with a short methodology note on how outliers were handled.",
+    artifacts: [
+      { type: "dashboard", url: "https://app.powerbi.com/view?r=kilimo-insights-example", description: "Published Power BI report with county filters and price trend pages." },
+      { type: "dataset_documentation", url: "https://docs.google.com/document/d/kilimo-data-example", description: "Source of the price data (KAMIS open data) and cleaning steps." },
+      { type: "evaluation_report", url: "https://docs.google.com/document/d/kilimo-method-example", description: "Methodology note: outlier handling and trend smoothing." },
+    ],
+    tech: ["Power BI", "Excel", "DAX"],
+    ai: "ChatGPT for DAX formula debugging.",
+    external: "KAMIS open price data. No templates.",
+    testing: "Open the dashboard, pick a county in the filter and compare the trend pages. The method note explains the smoothing.",
+    at: "2026-11-07T14:50:00Z",
+    computed: true,
+  },
+  {
+    // Backend/API project: repository plus API documentation and a test collection; no user-facing site.
+    id: "s12",
+    team: "Ledger Forge",
+    members: ["Ibrahim Salim", "Grace Mwende"],
+    track: "Software Engineering",
+    disciplines: ["backend"],
+    formats: ["backend_api"],
+    challenge: "Help small shops keep reliable records",
+    problem: "Small shops record sales on paper and lose track of credit given to customers.",
+    solution: "A REST API for sales, credit and payments with idempotent endpoints, meant to back any shop app.",
+    repo: "https://github.com/ledger-forge/shop-ledger-api",
+    artifacts: [
+      { type: "api_docs", url: "https://ledger-forge.example.dev/docs", description: "OpenAPI reference for all 14 endpoints." },
+      { type: "api_collection", url: "https://www.postman.com/ledger-forge/collection-example", description: "Postman collection with a happy-path run and the idempotency tests." },
+    ],
+    tech: ["FastAPI", "PostgreSQL", "Docker"],
+    ai: "GitHub Copilot for boilerplate.",
+    external: "FastAPI and SQLAlchemy. No starter template.",
+    testing: "Import the Postman collection, set the base URL from the README and run the collection.",
+    at: "2026-11-07T15:10:00Z",
+    computed: true,
+  },
+  {
+    // ML project delivered as a notebook and model card. No frontend and no deployment.
+    id: "s13",
+    team: "Mvua Models",
+    members: ["Joyce Kamau", "Samuel Rotich"],
+    track: "Data Science",
+    disciplines: ["machine_learning", "data_science"],
+    formats: ["ml_ai", "notebook"],
+    challenge: "Predict maize price volatility",
+    problem: "Rainfall variability makes next-season yield hard to anticipate for smallholder farmers.",
+    solution: "A gradient-boosted model forecasting seasonal rainfall anomalies per county, documented with a model card.",
+    artifacts: [
+      { type: "notebook", url: "https://colab.research.google.com/drive/mvua-models-example", description: "End-to-end notebook: data load, features, training and evaluation." },
+      { type: "model_card", url: "https://huggingface.co/mvua-models/rainfall-gbm-example", description: "Model card with training data, intended use and limitations." },
+    ],
+    tech: ["Python", "scikit-learn", "pandas", "Google Colab"],
+    ai: "Claude for explaining scikit-learn errors.",
+    external: "CHIRPS rainfall data (public). No starter code.",
+    testing: "Open the notebook and run all cells in order. It downloads the public data and prints the evaluation table at the end.",
+    at: "2026-11-07T14:30:00Z",
+    computed: true,
+  },
+  {
+    // Pipeline project under the Software Engineering track: shows the demo rule applying, and what is missing.
+    id: "s14",
+    team: "Shamba Pipes",
+    members: ["Kevin Barasa"],
+    track: "Software Engineering",
+    disciplines: ["data_engineering", "automation_devops"],
+    formats: ["pipeline_automation"],
+    challenge: "Make farm data usable",
+    problem: "Cooperative farm records arrive as scattered spreadsheets and cannot be combined.",
+    solution: "An Airflow pipeline that ingests the spreadsheets, validates them and loads a clean PostgreSQL schema.",
+    repo: "https://github.com/shamba-pipes/farm-etl",
+    tech: ["Airflow", "PostgreSQL", "dbt", "Docker"],
+    ai: "None.",
+    external: "Apache Airflow and dbt. No starter template.",
+    testing: "Run docker compose up, then trigger the farm_etl DAG from the Airflow UI.",
+    at: "2026-11-07T15:55:00Z",
+    computed: true,
+  },
 ];
 
+function toSubmission(s: Seed): Submission {
+  const ds = s.track === "Data Science";
+  return {
+    id: s.id,
+    createdAt: s.at,
+    teamName: s.team,
+    members: s.members.map((name) => ({ name })),
+    track: s.track,
+    disciplines: s.disciplines ?? (ds ? ["data_science", "machine_learning"] : ["fullstack"]),
+    projectFormats: s.formats ?? (ds ? ["ml_ai"] : ["web_app"]),
+    challenge: s.challenge,
+    problemDescription: s.problem,
+    proposedSolution: s.solution,
+    githubUrl: s.repo,
+    artifacts: s.artifacts ?? [],
+    demoUrl: s.demo,
+    technologies: s.tech,
+    aiToolsUsed: s.ai,
+    externalResources: s.external,
+    testingInstructions: s.testing,
+  };
+}
+
 export const mockSubmissions: SubmissionWithScreening[] = seeds.map((s) => {
+  const submission = toSubmission(s);
+
+  if (s.computed) {
+    // Computed by Charlie's own deterministic rules from the submission. Nothing is fetched: a repository, if
+    // any, stays unverified until someone runs live verification. Still labelled "mock" because the team is fictional.
+    const completeness = checkCompleteness(submission, undefined);
+    const artifactReviews = manualReviews(submission);
+    const flags: ScreeningFlag[] = [...completeness.flags, ...artifactFlags(submission, artifactReviews)].map((f, i) => ({
+      ...f,
+      id: `${s.id}-f${i}`,
+      resolved: false,
+    }));
+    const { status, explanation } = deriveStatus(completeness.missing, flags);
+    return {
+      submission,
+      screening: {
+        submissionId: s.id,
+        source: "mock",
+        status,
+        explanation,
+        missing: completeness.missing,
+        flags,
+        requirements: completeness.requirements,
+        artifactReviews,
+        notes: [],
+        finalDecision: "pending",
+      },
+    };
+  }
+
   const flags: ScreeningFlag[] = (s.flags ?? []).map((f, i) => {
     const isResolved = !!s.resolved?.includes(f.code);
     return {
@@ -227,22 +399,7 @@ export const mockSubmissions: SubmissionWithScreening[] = seeds.map((s) => {
   const missing = s.missing ?? [];
   const { status, explanation } = deriveStatus(missing, flags);
   return {
-    submission: {
-      id: s.id,
-      createdAt: s.at,
-      teamName: s.team,
-      members: s.members.map((name) => ({ name })),
-      track: s.track,
-      challenge: s.challenge,
-      problemDescription: s.problem,
-      proposedSolution: s.solution,
-      githubUrl: s.repo,
-      demoUrl: s.demo,
-      technologies: s.tech,
-      aiToolsUsed: s.ai,
-      externalResources: s.external,
-      testingInstructions: s.testing,
-    },
+    submission,
     screening: {
       submissionId: s.id,
       source: "mock",
@@ -250,6 +407,8 @@ export const mockSubmissions: SubmissionWithScreening[] = seeds.map((s) => {
       explanation,
       missing,
       flags,
+      requirements: [],
+      artifactReviews: [],
       github: s.github,
       notes: s.notes ?? [],
       finalDecision: "pending",

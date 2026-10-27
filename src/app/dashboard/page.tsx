@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { SCREENING_STATUSES, STATUS_LABEL, TRACKS } from "@/lib/constants";
 import { mockSubmissions } from "@/lib/mock-data";
+import { PROJECT_FORMATS } from "@/lib/taxonomy";
 import { DemoBanner } from "@/components/DemoBanner";
 import { StatsBar } from "@/components/StatsBar";
 import { SubmissionTable } from "@/components/SubmissionTable";
@@ -21,14 +22,16 @@ async function Dashboard({ searchParams }: { searchParams: PageProps<"/dashboard
   const q = first(sp.q).trim().toLowerCase();
   const track = first(sp.track);
   const status = first(sp.status);
+  const format = first(sp.format);
 
   const filtered = mockSubmissions.filter(
     ({ submission, screening }) =>
       (!q || submission.teamName.toLowerCase().includes(q)) &&
       (!track || submission.track === track) &&
+      (!format || submission.projectFormats.some((f) => f === format)) &&
       (!status || screening.status === status),
   );
-  const hasFilters = !!(q || track || status);
+  const hasFilters = !!(q || track || status || format);
   const field = "rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm";
 
   return (
@@ -45,6 +48,10 @@ async function Dashboard({ searchParams }: { searchParams: PageProps<"/dashboard
         <select name="track" defaultValue={track} aria-label="Filter by track" className={field}>
           <option value="">All tracks</option>
           {TRACKS.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <select name="format" defaultValue={format} aria-label="Filter by project format" className={field}>
+          <option value="">All formats</option>
+          {PROJECT_FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
         </select>
         <select name="status" defaultValue={status} aria-label="Filter by status" className={field}>
           <option value="">All statuses</option>

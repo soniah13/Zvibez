@@ -1,5 +1,8 @@
 import { formatEat } from "../format";
 import type { VerifyOutcome } from "../github/types";
+import { disciplineLabel, formatLabel, artifactLabel, platformOf } from "../taxonomy";
+import { DEFAULT_POLICY, type ScreeningPolicy } from "../screening/policy";
+import { describeExpectations } from "../screening/requirements";
 import type { ScreeningResult, Submission } from "../types";
 import type { ChecksPerformed } from "./schema";
 import { sanitizeText, summarizeFileList } from "./sanitize";
@@ -18,6 +21,10 @@ export interface EvidenceItem {
 export interface EvidenceBundle {
   items: EvidenceItem[];
   checks: ChecksPerformed;
+  /** Whether the team submitted a GitHub repository at all. */
+  repoSubmitted: boolean;
+  /** Evidence the declared formats and track expect, from the organizers' policy. */
+  expectations: ReturnType<typeof describeExpectations>;
 }
 
 export const README_MAX_CHARS = 8_000;
@@ -30,20 +37,43 @@ export function buildEvidenceBundle(input: {
   submission: Submission;
   screening: ScreeningResult;
   outcome?: VerifyOutcome;
+  policy?: ScreeningPolicy;
 }): EvidenceBundle {
   const { submission: s, screening, outcome } = input;
+  const expectations = describeExpectations(s, input.policy ?? DEFAULT_POLICY);
   const items: EvidenceItem[] = [];
   const add = (id: string, origin: EvidenceOrigin, label: string, text: string) => items.push({ id, origin, label, text });
 
   // 1. The team's own statements.
+  add("claim.track", "team_claim", "Official competition track the team selected", sanitizeText(s.track, 100));
+  add(
+    "claim.disciplines",
+    "team_claim",
+    "Disciplines the team says its project spans",
+    sanitizeText([...s.disciplines.map(disciplineLabel), ...(s.otherDiscipline ? [`Other: ${s.otherDiscipline}`] : [])].join("; "), 500),
+  );
+  add("claim.formats", "team_claim", "Project format(s) the team declared", sanitizeText(s.projectFormats.map(formatLabel).join("; "), 500));
   add("claim.challenge", "team_claim", "Challenge the team selected", sanitizeText(s.challenge, 1_000));
   add("claim.problem", "team_claim", "Problem description (team's words)", sanitizeText(s.problemDescription, 4_000));
   add("claim.solution", "team_claim", "Proposed solution (team's words)", sanitizeText(s.proposedSolution, 4_000));
-  add("claim.technologies", "team_claim", `Technologies the team lists (${s.track} track)`, sanitizeText(s.technologies.join(", "), 1_000));
+  add("claim.technologies", "team_claim", "Technologies, tools and platforms the team lists", sanitizeText(s.technologies.join(", "), 1_000));
   add("claim.ai_tools", "team_claim", "AI tools the team says it used", sanitizeText(s.aiToolsUsed, 2_000));
   add("claim.external_resources", "team_claim", "Libraries, templates, starter code and assets the team declares", sanitizeText(s.externalResources, 2_000));
   add("claim.testing", "team_claim", "Testing and reproduction instructions (team's words)", sanitizeText(s.testingInstructions, 3_000));
   add("claim.demo", "team_claim", "Demo link", s.demoUrl ? `The team provided a demo link: ${sanitizeText(s.demoUrl, 300)} (not opened or tested)` : "The team provided no demo link.");
+
+  // Artifact links are the team's own evidence. Their descriptions are claims and the links were never opened.
+  (s.artifacts ?? []).forEach((a, i) =>
+    add(
+      `claim.artifact.${i + 1}`,
+      "team_claim",
+      `Artifact the team links: ${artifactLabel(a.type)} on ${platformOf(a.url)} (link not opened)`,
+      sanitizeText(
+        [`URL: ${a.url}`, `Team's description: ${a.description}`, ...(a.timelineEvidence ? [`Team's note on when it was made (unverified): ${a.timelineEvidence}`] : [])].join("\n"),
+        1_500,
+      ),
+    ),
+  );
 
   // 2. Facts retrieved from GitHub.
   const checks: ChecksPerformed = {
@@ -51,13 +81,22 @@ export function buildEvidenceBundle(input: {
     commitHistory: false,
     fileListing: false,
     readmeExcerptRead: false,
+    artifactsOpened: false,
     sourceFilesRead: false,
     codeExecuted: false,
     deploymentTested: false,
     modelEvaluated: false,
   };
 
-  if (!outcome) {
+  const repoSubmitted = !!s.githubUrl?.trim();
+  if (!repoSubmitted) {
+    add(
+      "repo.status",
+      "system",
+      "Repository verification",
+      "The team submitted no GitHub repository. Whatever evidence it has is in the artifacts it declared, none of which Charlie opened. No repository facts exist.",
+    );
+  } else if (!outcome) {
     add("repo.status", "system", "Repository verification", "No GitHub verification was available for this summary.");
   } else if (outcome.status !== "ok") {
     add(
@@ -119,6 +158,20 @@ export function buildEvidenceBundle(input: {
   if (screening.missing.length > 0) {
     add("missing", "screening_flag", "Missing submission information", screening.missing.map((m) => `${m.field}: ${m.reason}`).join("\n"));
   }
+  add(
+    "expectations",
+    "system",
+    "Evidence the organizers' policy expects for the declared format and track (not every project must have all of it)",
+    expectations.map((e) => `[${e.level}] ${e.label}: ${e.expectation}`).join("\n") || "No specific evidence is expected.",
+  );
+  if (screening.requirements.length > 0) {
+    add(
+      "requirements",
+      "screening_flag",
+      "Result of checking that expected evidence (Charlie's deterministic check)",
+      screening.requirements.map((r) => `[${r.level}] ${r.label}: ${r.outcome.replace(/_/g, " ")}. ${sanitizeText(r.detail, 300)}`).join("\n"),
+    );
+  }
   for (const f of screening.flags) {
     add(
       `flag.${f.code}`,
@@ -140,10 +193,10 @@ export function buildEvidenceBundle(input: {
       `Read the README text: ${checks.readmeExcerptRead ? "yes" : "no"}`,
       "Read source file contents: no",
       "Ran or installed any submitted code: no",
-      "Opened or tested the demo or deployment: no",
+      "Opened or tested the demo, deployment or any artifact link (designs, notebooks, dashboards, models): no",
       "Ran or evaluated any model: no",
     ].join("\n"),
   );
 
-  return { items, checks };
+  return { items, checks, repoSubmitted, expectations };
 }

@@ -103,7 +103,7 @@ describe("Data Science artifacts", () => {
   it("does not require every artifact: a script alone is fine for completeness", () => {
     const r = checkCompleteness(ds, tree(["README.md", "train.py"]));
     expect(r.missing).toEqual([]);
-    expect(codes(r)).toEqual(["DS_NO_SUPPORTING_ARTIFACTS"]); // inconclusive only
+    expect(codes(r)).toEqual(["NO_SUPPORTING_ARTIFACTS"]); // inconclusive only
     expect(r.flags[0].kind).toBe("inconclusive");
   });
   it("a model file or evaluation path counts as supporting evidence", () => {
@@ -120,7 +120,8 @@ describe("Data Science artifacts", () => {
   it("is inconclusive, not missing, when the tree was truncated", () => {
     const r = checkCompleteness(ds, tree(["README.md", "index.html"], true));
     expect(fields(r)).not.toContain("Data science code");
-    expect(codes(r)).toContain("DS_ARTIFACTS_UNVERIFIED");
+    expect(codes(r)).toContain("SOURCE_UNVERIFIED");
+    expect(r.flags.find((f) => f.code === "SOURCE_UNVERIFIED")?.detail).toMatch(/analysis/i);
   });
   it("software engineering projects are not asked for data science artifacts", () => {
     expect(codes(checkCompleteness(makeSubmission(), tree(["src/a.ts"])))).toEqual([]);
