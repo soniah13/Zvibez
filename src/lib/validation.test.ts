@@ -30,7 +30,9 @@ describe("a non-repository project is a valid submission", () => {
     expect(parse().success).toBe(true);
   });
   it("accepts an omitted GitHub URL and omitted artifacts", () => {
-    const { githubUrl: _g, artifacts: _a, ...rest } = base;
+    const rest: Record<string, unknown> = { ...base };
+    delete rest.githubUrl;
+    delete rest.artifacts;
     expect(submissionSchema.safeParse(rest).success).toBe(true);
   });
   it("still rejects a GitHub URL that is not a GitHub repository", () => {
