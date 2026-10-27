@@ -37,6 +37,10 @@ export interface ScreeningFlag {
   kind: FlagKind;
   title: string;
   detail: string;
+  /** ISO timestamp the flag is about, where relevant. */
+  timestamp?: string;
+  /** Commit SHA(s) supporting the flag, where relevant. */
+  commitSha?: string;
   evidenceUrl?: string;
   resolved: boolean;
   resolvedBy?: string;
@@ -55,9 +59,24 @@ export interface ReviewNote {
   body: string;
 }
 
+export interface BranchSummary {
+  name: string;
+  isDefault: boolean;
+  commitsExamined: number;
+  /** True only if every commit reachable from this branch was examined. */
+  historyComplete: boolean;
+  totalCommits?: number;
+  earliestCommitAt?: string;
+}
+
 export interface GithubVerification {
   checkedAt: string;
-  accessible: boolean;
+  /** true = reachable, false = confirmed not accessible (404/403), undefined = unknown (the check failed). */
+  accessible?: boolean;
+  /** Branches actually inspected. */
+  branches?: BranchSummary[];
+  /** Anything that was not or could not be checked. */
+  limitations?: string[];
   repoCreatedAt?: string;
   defaultBranch?: string;
   earliestCommitAt?: string;
@@ -69,6 +88,8 @@ export interface GithubVerification {
 
 export interface ScreeningResult {
   submissionId: string;
+  /** "mock" = seeded demo data; "live" = produced by a GitHub verification run. */
+  source: "mock" | "live";
   status: ScreeningStatus;
   /** Plain-language explanation shown next to every status. */
   explanation: string;

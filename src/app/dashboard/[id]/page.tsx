@@ -3,10 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMockSubmission } from "@/lib/mock-data";
 import { formatEat } from "@/lib/format";
-import { EVENT } from "@/lib/constants";
 import { DemoBanner } from "@/components/DemoBanner";
-import { FlagList } from "@/components/FlagList";
-import { StatusBadge } from "@/components/StatusBadge";
+import { ScreeningPanel } from "@/components/ScreeningPanel";
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -16,8 +14,6 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     </div>
   );
 }
-
-const yn = (v?: boolean) => (v === undefined ? "Not checked" : v ? "Yes" : "No");
 
 export default function ReportPage({ params }: PageProps<"/dashboard/[id]">) {
   return (
@@ -32,52 +28,14 @@ async function Report({ params }: { params: PageProps<"/dashboard/[id]">["params
   const item = getMockSubmission(id);
   if (!item) notFound();
   const { submission: s, screening: r } = item;
-  const gh = r.github;
 
   return (
     <div className="space-y-6">
       <Link href="/dashboard" className="text-sm text-slate-600 underline">← Back to dashboard</Link>
       <DemoBanner />
+      <h1 className="text-xl font-semibold">{s.teamName}</h1>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-semibold">{s.teamName}</h1>
-          <StatusBadge status={r.status} />
-        </div>
-        <p className="text-sm text-slate-700">{r.explanation}</p>
-        {r.missing.length > 0 && (
-          <ul className="list-disc pl-5 text-sm text-slate-600">
-            {r.missing.map((m) => <li key={m.field}><strong>{m.field}:</strong> {m.reason}</li>)}
-          </ul>
-        )}
-      </div>
-
-      <section>
-        <h2 className="mb-2 font-semibold">Screening flags</h2>
-        <FlagList flags={r.flags} />
-      </section>
-
-      <section>
-        <h2 className="mb-2 font-semibold">Repository verification</h2>
-        <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white px-4">
-          {gh ? (
-            <>
-              <Row label="Checked">{formatEat(gh.checkedAt)}</Row>
-              <Row label="Accessible">{yn(gh.accessible)}</Row>
-              <Row label="Repo created">{formatEat(gh.repoCreatedAt)}</Row>
-              <Row label="Earliest commit">{formatEat(gh.earliestCommitAt)}</Row>
-              <Row label="Default branch">{gh.defaultBranch ?? "—"}</Row>
-              <Row label="Fork">{yn(gh.isFork)}</Row>
-              <Row label="README">{yn(gh.hasReadme)}</Row>
-            </>
-          ) : (
-            <Row label="Status">Not yet checked. Automated verification arrives in Phase 2.</Row>
-          )}
-        </dl>
-        <p className="mt-1 text-xs text-slate-500">
-          Event window: {EVENT.date}, 07:00–19:00 EAT. Dates on the event day are not proof the project was built during the event.
-        </p>
-      </section>
+      <ScreeningPanel submissionId={s.id} initial={r} />
 
       <section>
         <h2 className="mb-2 font-semibold">Team submission <span className="text-xs font-normal text-slate-500">(claims made by the team)</span></h2>
@@ -112,6 +70,7 @@ async function Report({ params }: { params: PageProps<"/dashboard/[id]">["params
             ))}
           </ul>
         )}
+        <p className="mt-2 text-xs text-slate-500">Final organizer decision: <strong>{r.finalDecision}</strong></p>
       </section>
 
       <section>

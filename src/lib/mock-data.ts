@@ -131,7 +131,7 @@ const seeds: Seed[] = [
     external: "Sentinel-2 imagery (ESA).",
     testing: "Run `python run_pipeline.py --sample`.",
     at: "2026-11-07T16:10:00Z",
-    github: { checkedAt: "2026-11-07T16:12:00Z", accessible: false },
+    github: { checkedAt: "2026-11-07T16:12:00Z" },
     flags: [
       flag("GITHUB_UNAVAILABLE", "inconclusive", "GitHub check could not be completed", "GitHub API returned a rate-limit response. This is a technical failure, not evidence of misconduct. Re-run verification."),
     ],
@@ -191,6 +191,22 @@ const seeds: Seed[] = [
       flag("LARGE_INITIAL_COMMIT", "suspicious", "Large initial commit", "First commit 1 minute after creation. A starter template is declared, so this may be benign.", "https://github.com/soko-smart/marketplace/commits/main"),
     ],
   },
+  {
+    // Fictional team pointing at GitHub's public sample repository, so "Run live verification" can be tried for real.
+    id: "s9",
+    team: "Live Test (Hello-World)",
+    members: ["Demo Member"],
+    track: "Software Engineering",
+    challenge: "Demo: exercising live GitHub verification",
+    problem: "Organizers need to see live verification working end to end.",
+    solution: "Points at the public octocat/Hello-World repository. It pre-dates the event, so it should be flagged.",
+    repo: "https://github.com/octocat/Hello-World",
+    tech: ["Git"],
+    ai: "None.",
+    external: "None.",
+    testing: "Run live verification from the report page.",
+    at: "2026-11-07T12:00:00Z",
+  },
 ];
 
 export const mockSubmissions: SubmissionWithScreening[] = seeds.map((s) => {
@@ -225,6 +241,7 @@ export const mockSubmissions: SubmissionWithScreening[] = seeds.map((s) => {
     },
     screening: {
       submissionId: s.id,
+      source: "mock",
       status,
       explanation,
       missing,
